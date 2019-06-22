@@ -24,12 +24,14 @@
 #include <Wire.h>
 #include "Adafruit_SHT31.h"
 
-const int gateControl = 3;
+const int lights = 4;
+const int peltier = 5;
 const int ledPin = LED_BUILTIN;// the number of the LED pin, this is pin 13 for the LED
-const int humidityThreshold = 50.0;
+const int humidityThreshold = 60.0;
 
 int ledState = LOW;
 int ledStripState = LOW;
+int peltierState = LOW;
 
 /*
   This next section defines a a subclass of the tempurature sensing
@@ -76,7 +78,12 @@ class Tempsensor: public Adafruit_SHT31 {
         if (ledStripState == LOW) {
           ledStripState = HIGH;
           Serial.println("Humidity is >= " + String(humidityThreshold) + ", turning LED strip on");
-          digitalWrite(gateControl, ledStripState);
+          digitalWrite(lights, ledStripState);
+        }
+        if (peltierState == LOW) {
+          peltierState = HIGH;
+          Serial.println("Humidity is >= " + String(humidityThreshold) + ", turning Peltier on");
+          digitalWrite(peltier, peltierState);
         }
       }
       else {
@@ -88,7 +95,12 @@ class Tempsensor: public Adafruit_SHT31 {
         if (ledStripState == HIGH) {
           ledStripState = LOW;
           Serial.println("Humidity is < " + String(humidityThreshold) + ", turning LED strip off");
-          digitalWrite(gateControl, ledStripState);
+          digitalWrite(lights, ledStripState);
+        }
+        if (peltierState == HIGH) {
+          peltierState = LOW;
+          Serial.println("Humidity is < " + String(humidityThreshold) + ", turning Peltier off");
+          digitalWrite(peltier, peltierState);
         }
       }
     }
@@ -133,9 +145,9 @@ void setup() {
     prevent a floating pin which can casues issues
 
   */
-  pinMode(4, OUTPUT);
-  pinMode(5, OUTPUT);
-  pinMode(gateControl, OUTPUT);
+  pinMode(3, OUTPUT);
+  pinMode(lights, OUTPUT);
+  pinMode(peltier, OUTPUT);
 
   Serial.begin(9600);
 
