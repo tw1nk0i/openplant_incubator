@@ -1,23 +1,16 @@
 /***************************************************
-  This is an test case to look at the function of the temperature
-  sensor when the entire
+  This is the main file to control the incubator. Rewritten from Danny's prototype_incubator.ino
 
   Designed specifically to work with the SHT31-D sensor from Adafruit
   ----> https://www.adafruit.com/products/2857
 
-  These sensors use I2C to communicate, 2 pins are required to
-  interface
-
   Wired the SHT31-D to the Arduino following the first diagram here:
   http://cactus.io/hookups/sensors/temperature-humidity/sht31/hookup-arduino-to-sensirion-sht31-temp-humidity-sensor
 
-  Connect the LED strip to the gate following the diagram in the Cloud-based Lab Monitor google doc:
+  Connect the LED strip to the MOSFET transistor following the diagram in the Cloud-based Lab Monitor google doc:
   Power Supply - to breadboard minus rail
   Power Supply + to LED strip red wire
   LED strip black wire to gate middle pin
-
-  The small LED does not light up because when the humidity sensor is connected, the Arduino 
-  does not have enough power to power it.
  ****************************************************/
 
 #include "Adafruit_SHT31.h"
@@ -31,8 +24,6 @@ const int peltier = 5;
 
 int ledState = LOW;
 int peltierState = LOW;
-
-unsigned long previousMillis = 0;
 
 Adafruit_SHT31 sht31 = Adafruit_SHT31(); // name the temp sensor
 
@@ -63,48 +54,58 @@ unsigned long getCurrentTime() {
   return millis();
 }
 
-void printCurrentInfo(unsigned long currentTime,float currentTemp) {
+void printCurrentData(unsigned long currentTime, float currentTemp, float currentHum) {
   Serial.print("Current Time = "); 
   Serial.println(currentTime);
   
   Serial.print("Temp *C = "); 
   Serial.println(currentTemp);
 
-  float humidity = sht31.readHumidity();
   Serial.print("Hum. % = "); 
-  Serial.println(humidity);
+  Serial.println(currentHum);
 }
 
+void recordCurrentData(unsigned long currentTime, float currentTemp, float currentHum) {
+  // TODO connect to raspberry pi and save the data somewhere in the cloud
+}
+
+const int TEMP_TOL = 1.5;
 void adjustPeltier(float currentTemp) {
   // TODO replace with a smarter algorithm, use PID like Danny
-  if (currentTemp > desiredTemp && peltierState == LOW) {
+  if (currentTemp > desiredTemp + TEMP_TOL && peltierState == LOW) {
     peltierState = HIGH;
     Serial.println("Current temperature " + String(currentTemp) + " is higher than desired temperature " + String(desiredTemp) + ", turning Peltier cooler on");
     digitalWrite(peltier, peltierState);
   }
-  if (currentTemp < desiredTemp && peltierState == HIGH) {
+  else if (currentTemp < desiredTemp && peltierState == HIGH) {
     peltierState = LOW;
     Serial.println("Current temperature " + String(currentTemp) + " is lower than desired temperature " + String(desiredTemp) + ", turning Peltier cooler off");
     digitalWrite(peltier, peltierState);
   }
 }
 
+const int EIGHT_HOURS = 1000*60*60*8;
+const int SIXTEEN_HOURS = 1000*60*60*16;
+unsigned long lightToggleTime = -EIGHT_HOURS;
 void adjustLight() {
-  // TODO change this to a 16hr on, 8hr off cycle
-  // if the LED is off turn it on and vice-versa:
-  if (ledState == LOW) {
+  // TODO change this to use the real time clock
+  if (ledState == LOW && (millis()-lightToggleTime) > EIGHT_HOURS) {
     ledState = HIGH;
-    Serial.println("turning LED on");
-  } else {
+    digitalWrite(lights, ledState);
+    Serial.println("LED has been off for > 8 hours, turning LED on");
+  } else if (ledState == HIGH && (millis()-lightToggleTime) > SIXTEEN_HOURS) {
     ledState = LOW;
-    Serial.println("turning LED off");
+    digitalWrite(lights, ledState);
+    Serial.println("LED has been on for > 16 hours, turning LED off");
   }
 }
 
 void loop() {
   unsigned long currentTime = getCurrentTime();
   float currentTemp = sht31.readTemperature();
-  printCurrentInfo(currentTime, currentTemp);
+  float currentHum = sht31.readHumidity();
+  printCurrentData(currentTime, currentTemp, currentHum);
+  recordCurrentData(currentTime, currentTemp, currentHum);
 
   adjustPeltier(currentTemp);
   adjustLight();
